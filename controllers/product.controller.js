@@ -5,21 +5,31 @@ import Product from "../models/product.js";
 
 export const addProduct = async (req, res) => {
   try {
-    let productData = JSON.parse(req.bodu.productData);
-    const image = req.files;
-    let imageUrl = await Promise.all(
-      image.map(async (item) => {
+    let productData = JSON.parse(req.body.productData); // parse JSON
+
+    const images = req.files;
+
+    if (!images || images.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No images uploaded" });
+    }
+
+    let imageUrls = await Promise.all(
+      images.map(async (item) => {
         let result = await cloudinary.uploader.upload(item.path, {
           resource_type: "image",
         });
-        return result.secure_urll;
+        return result.secure_url;
       })
     );
-    await Product.create({ ...productData, image: imageUrl });
-    res.json({ success: true, message: "Product Added" });
+
+    const product = await Product.create({ ...productData, image: imageUrls }); // <-- FIXED key
+
+    res.json({ success: true, message: "Product Added", product });
   } catch (error) {
     console.log(error.message);
-    res.json({
+    res.status(500).json({
       success: false,
       message: error.message,
     });
@@ -31,7 +41,7 @@ export const addProduct = async (req, res) => {
 export const productList = async (req, res) => {
   try {
     const products = await Product.find({});
-    res.json({ success: false, products });
+    res.json({ success: true, products });
   } catch (error) {
     console.log(error.message);
     res.json({
@@ -61,8 +71,8 @@ export const productById = async (req, res) => {
 
 export const changeStock = async (req, res) => {
   try {
-    const { id, inStock } = req.body;
-    await Product.findByIdAndUpdate(id, { inStock });
+    const { productId, inStock } = req.body;
+    await Product.findByIdAndUpdate(productId, { inStock });
     res.json({ success: true, message: "Stock updated" });
   } catch (error) {
     console.log(error.message);
